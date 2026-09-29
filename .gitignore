@@ -1,21 +1,40 @@
 # API keys and local environment files
 **/.env
+**/.env.*
 !**/.env.example
 
 # Python virtual environments and caches
 **/venv/
 **/.venv/
+**/env/
+**/ENV/
 **/__pycache__/
 **/*.py[cod]
+**/*$py.class
 **/.pytest_cache/
 **/.mypy_cache/
 **/.ruff_cache/
+**/build/
+**/dist/
+**/*.egg-info/
 
-# Editors and operating-system files
+# Local agent, tool, and editor state
+**/.agents/
+**/.codex/
+**/.git-backup/
+**/.claude/
+**/.understand-anything/
 .vscode/
 .idea/
+
+# Logs and runtime output
+**/*.log
+**/logs/
+
+# Operating-system files
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Generated Lab5 exports
 Lab5/exports/*
