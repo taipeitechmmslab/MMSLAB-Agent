@@ -1,0 +1,12 @@
+python-dotenv==1.2.2
+langchain==1.2.17
+langchain-core==1.3.3
+langchain-openai==1.2.1
+langchain-community==0.4.1
+langchain-text-splitters==1.1.2
+langchain-mcp-adapters==0.2.2
+langchain-nvidia-ai-endpoints==1.2.1
+langgraph==1.1.10
+langchain-milvus==0.2.2
+mcp==1.27.0
+pymilvus==2.5.18

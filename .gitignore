@@ -1,0 +1,22 @@
+# API keys and local environment files
+**/.env
+!**/.env.example
+
+# Python virtual environments and caches
+**/venv/
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# Editors and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Generated Lab5 exports
+Lab5/exports/*
+!Lab5/exports/.gitkeep
