@@ -1,24 +1,8 @@
-"""
-CrewAI 個人化旅遊規劃 - Task 與 Crew 組裝
-=================================
-crew.py 負責建立每輪對話使用的通用 Task，並將一位 Manager Agent
-與景點行程、住宿、天氣交通三位 Worker Agent 組成 Hierarchical Crew。
-
-這個檔案不預先固定 Agent 的執行順序；使用者問題送入 Crew 後，
-由 Manager Agent 判斷需要委派哪些 Worker Agent，再審查並整合結果。
-"""
-
-# ── 載入套件與 Agent 建立函數 ───────────────────────
-
 from crewai import Crew, Process, Task
 from crewai_tools.adapters.tool_collection import ToolCollection
-
 from agents import build_agents, build_llm
 
-# ── Task 行為規格 ────────────────────────────────────
-
-# 通用 Task 接收本輪問題與對話背景，實際工作流程由 Manager 動態決定
-
+# 通用 Task 的任務描述，帶入今天日期、本輪問題與先前對話背景
 USER_REQUEST_DESCRIPTION = (
     "今天是 {today}。使用者本輪的旅遊問題是：{query}\n\n"
     "先前對話背景如下：\n{conversation_context}\n\n"
@@ -31,7 +15,7 @@ USER_REQUEST_DESCRIPTION = (
     "一般最終回答不得超過一千五百字，中文字、數字、標點、空白與網址全部計入。"
 )
 
-# expected_output 定義 Crew 最終交付內容必須具備的品質與格式
+# 通用 Task 的期望產出，定義最終答案的品質與格式
 USER_REQUEST_EXPECTED_OUTPUT = (
     "一份只回答本輪問題、同時正確承接先前對話的繁體中文答案。"
     "所有可能變動的資訊必須經過查證；最終答案依景點、住宿、天氣與交通分類保留能直接支持內容的"
@@ -43,33 +27,23 @@ USER_REQUEST_EXPECTED_OUTPUT = (
     "Markdown 匯出成功時，只輸出 exports/ 開頭的 .md 相對路徑。"
 )
 
-# ── 組裝 Hierarchical Crew ──────────────────────────
-
-def build_crew(tools: ToolCollection) -> Crew:
-    """建立本輪要執行的 Hierarchical Crew。"""
-    # 先建立共用 LLM，再建立一位 Manager Agent 與三位 Worker Agent
+# 定義函式 build_crew，建立本輪要執行的 Crew
+def build_crew(tools: ToolCollection) -> Crew:  # 輸入 MCP 工具清單
+    # 建立共用 LLM，再建立 Manager Agent 與三個專責 Agent
     manager, workers = build_agents(build_llm(), tools)
 
-    # 建立 Crew，將通用 Task、Manager 與 Worker 組成層級式多 Agent 團隊
+    # 把 Task、Manager Agent 與三個專責 Agent 組成 Crew
     return Crew(
-        # agents 只放入可被委派的 Worker，Manager 由 manager_agent 指定
-        agents=workers,
-        # 每輪只有一張通用入口 Task，實際子工作由 Manager 現場判斷
+        agents=workers,  # 只放入可以被分派的三個專責 Agent
+        # 每輪只有一張通用 Task，實際要分派給誰由 Manager Agent 判斷
         tasks=[
             Task(
-                # description 會在 kickoff 時帶入日期、問題與先前對話
-                description=USER_REQUEST_DESCRIPTION,
-                # expected_output 定義最終答案必須符合的品質與格式
-                expected_output=USER_REQUEST_EXPECTED_OUTPUT,
-                # 不指定專責 Agent，由 Manager 依本輪問題動態選擇 Worker
+                description=USER_REQUEST_DESCRIPTION,  # 任務描述
+                expected_output=USER_REQUEST_EXPECTED_OUTPUT,  # 期望產出
             )
         ],
-        # 使用 Hierarchical Process，讓 Manager 負責動態委派與整合
-        process=Process.hierarchical,
-        # 指定本輪負責管理三位 Worker 的 Manager Agent
-        manager_agent=manager,
-        # 顯示 Crew、Agent 與工具的完整執行面板
-        verbose=True,
-        # 關閉可能插入下一輪輸入提示的背景 Trace
-        tracing=False,
+        process=Process.hierarchical,  # 使用層級模式，由 Manager Agent 分派與整合
+        manager_agent=manager,  # 指定 Manager Agent
+        verbose=True,  # 顯示 Crew、Agent 與工具的執行過程
+        tracing=False,  # 關閉背景追蹤，避免訊息插入對話畫面
     )
