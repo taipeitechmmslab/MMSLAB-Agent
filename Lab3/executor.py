@@ -1,30 +1,12 @@
-"""
-Travel Agent - Executor 節點（Proactivity）
-=========================================
-executor.py 負責依 planner 的計畫自主呼叫工具蒐集資訊，並產出每日行程草案。
-
-程式流程：
-  1. 建立系統提示詞，定義工具使用、資料查證與輸出規則。
-  2. 使用 create_agent 建立 ReAct Agent，並設定模型呼叫失敗時的自動重試。
-  3. 將對話歷史、偏好資料與 Planner 計畫組成本輪執行指令。
-  4. 執行 Agent，取得工具訊息與完整行程草案。
-  5. 只把 Agent 新產生的訊息寫回 State，避免一次性指令污染對話歷史。
-"""
-
-# ── 載入套件 ──────────────────────────────────────────────
 from datetime import date
-
 from langchain.agents import create_agent
 from langchain.agents.middleware import ModelRetryMiddleware
 from langchain_core.messages import HumanMessage
 from openai import APIError
-
 from state import TravelState
 
-
-# ── Executor Prompt：工具、查證、修訂與輸出規則 ──────────
+# 定義函式 build_system_prompt，建立 executor node 的系統 Prompt
 def build_system_prompt() -> str:
-    """建立系統提示詞，定義 executor 的工具規則、查證原則與輸出格式。"""
     return """\
 你是個人化旅遊規劃的執行助理，手上有三類工具：
 Tavily 搜尋（景點/住宿/交通/簽證即時資訊）、天氣查詢（Open-Meteo）、匯率換算（Frankfurter）。
@@ -76,41 +58,39 @@ Tavily 搜尋（景點/住宿/交通/簽證即時資訊）、天氣查詢（Open
 - 不要寫景點歷史背景、文化典故，只列實用資訊。
 - 若收到修正要求，務必逐項處理問題（改數字、換地點、補備案），並在最後加「修正摘要」逐項說明「問題→如何改」。"""
 
-
-# ── 建立 Executor 節點 ────────────────────────────────────
-def create_executor(llm, tools):
-    """建立 executor 節點，回傳可註冊進 StateGraph 的 async 函式。"""
-    # 將模型、MCP 工具與系統提示詞交給 create_agent，建立會自行管理工具迴圈的 ReAct Agent。
+# 定義函式 create_executor，建立 executor node 並回傳
+def create_executor(llm, tools):  # 輸入 LLM 與工具清單
+    # 建立 Agent，它會自己決定要呼叫哪些工具
     agent = create_agent(
         llm,
         tools,
         system_prompt=build_system_prompt(),
-        # 設定模型呼叫失敗時的重試次數、等待時間與錯誤處理方式。
+        # LLM 呼叫失敗時自動重試
         middleware=[
             ModelRetryMiddleware(
-                # 失敗後最多重試 2 次。
+                # 最多重試 2 次
                 max_retries=2,
-                # 第一次重試前等待 5 秒。
+                # 第一次等 5 秒
                 initial_delay=5.0,
-                # 每次重試將等待時間乘以 2。
+                # 之後每次等待時間加倍
                 backoff_factor=2.0,
-                # 單次最多等待 15 秒。
+                # 最多等 15 秒
                 max_delay=15.0,
-                # 關閉隨機延遲，方便觀察固定間隔。
+                # 不加入隨機延遲
                 jitter=False,
-                # 只有 API 錯誤才會重試。
+                # 只有 API 出錯才重試
                 retry_on=(APIError,),
-                # 全部失敗後將錯誤交給 chat.py 處理。
+                # 全部失敗就交給 chat.py 處理
                 on_failure="error",
             )
         ],
     )
 
-    # 內部 async 函式就是實際註冊到 StateGraph 的 Executor 節點。
-    async def executor(state: TravelState) -> dict:
-        # 將 Planner 的步驟清單加上編號，整理成適合放入 Prompt 的純文字。
+    # 定義 node executor，照著計畫查資料，排出每日行程草案
+    async def executor(state: TravelState) -> dict:  # 以 asynchronous 方式執行，輸入 TravelState 讀取 messages、preferences 與 plan 欄位
+        # 把計畫的步驟加上編號
         plan_text = "\n".join(f"{i + 1}. {step}" for i, step in enumerate(state["plan"]))
-        # 建立本輪一次性指令，補充日期、偏好資料與 Planner 產生的執行計畫。
+        # 把今天日期、偏好與計畫整理成這輪的指令
         directive = HumanMessage(content=(
             f"[今天日期] {date.today().isoformat()}（請以此推算「下週二」等相對日期，"
             "並相信天氣/匯率工具回傳的年份）\n\n"
@@ -118,16 +98,15 @@ def create_executor(llm, tools):
             f"[執行計畫]\n{plan_text}\n\n"
             "請依上述計畫與偏好檔案呼叫工具蒐集資訊，並產出完整的每日行程草案。"
         ))
-        # 複製 State 中的歷史訊息並在最後加入 directive，不直接修改原本的 messages list。
+        # 把指令接在對話歷史後面
         input_messages = list(state["messages"]) + [directive]
-        # 啟動 ReAct Agent；它會依計畫自行呼叫工具，最後產生完整行程草案。
+        # 交給背景的 Agent 照計畫查資料並寫出行程草案，前景以 await 取回結果
         result = await agent.ainvoke({"messages": input_messages})
 
-        # Agent 回傳的 messages 會包含輸入歷史，因此依輸入長度切掉原有部分。
-        # 只保留本輪新增的 AIMessage 與 ToolMessage，避免重複寫入 State。
+        # 只取出 Agent 這輪新產生的訊息
         new_messages = result["messages"][len(input_messages):]
-        # MessagesState 會把這些新訊息附加到既有對話歷史。
+        # 新訊息會自動接在對話歷史後面
         return {"messages": new_messages}
 
-    # 回傳節點函式本身，main.py 之後會把它註冊到 StateGraph。
+    # 回傳這個 node，交給 main.py 使用
     return executor

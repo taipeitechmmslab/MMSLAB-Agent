@@ -1,82 +1,55 @@
-"""
-CrewAI 個人化旅遊規劃 - Agent 與模型設定
-=================================
-agents.py 負責建立一位 Manager Agent 與三位 Worker Agent，
-並設定所有 Agent 共用的 LLM、Knowledge Embedding Model、MCP 工具與 Skill。
-
-Agent 分工：
-  - Manager Agent：理解需求、動態分派工作並驗收結果
-  - 景點與行程規劃 Agent：分析旅遊偏好、查證景點並整合完整行程
-  - 住宿規劃 Agent：查詢住宿地點、價格與入住條件
-  - 天氣與交通資訊 Agent：查詢天氣、交通、票券與匯率
-"""
-
-# ── 載入套件 ────────────────────────────────────────
-
 import os
 from pathlib import Path
-
 from crewai import LLM, Agent
 from crewai.knowledge.source.text_file_knowledge_source import TextFileKnowledgeSource
 from crewai.skills import discover_skills
 from crewai_tools import FileWriterTool
 from crewai_tools.adapters.tool_collection import ToolCollection
 
-# ── 專案路徑、Knowledge 與 Skill ─────────────────────────
-
-# 取得專案根目錄，供知識庫、Skill 與匯出工具共用
+# 專案根目錄，供知識庫、Skill 與匯出工具共用
 PROJECT_DIR = Path(__file__).resolve().parent
 
-# 掃描專案的 skills/ 資料夾，取得行程 Markdown 匯出 Skill
+# 掃描 skills 資料夾，取得行程匯出 Skill
 MARKDOWN_EXPORT_SKILL = discover_skills(PROJECT_DIR / "skills")[0]
 
-
-# ── 建立所有 Agent 共用的 LLM ──────────────────────────────
+# 定義函式 build_llm，建立四個 Agent 共用的 LLM
 def build_llm() -> LLM:
-    """建立所有 Agent 共用的 NVIDIA NIM 模型。"""
-    # 從 .env 取得 NVIDIA NIM 位址，讓 base_url 與 api_base 使用相同設定
+    # 讀取 .env 設定的 NVIDIA NIM 位址
     base = os.getenv("NVIDIA_BASE_URL")
 
-    # NVIDIA NIM 提供 OpenAI 相容介面，後續四位 Agent 共用這組模型設定
+    # 透過 OpenAI 相容介面呼叫 NVIDIA NIM
     return LLM(
-        # LLM_MODEL 保存 NVIDIA 模型名稱，前方補上 openai/ 讓 CrewAI 使用相容介面
+        # 在模型名稱前加上 openai/，讓 CrewAI 使用 OpenAI 相容介面
         model=f"openai/{os.getenv('LLM_MODEL')}",
         # NVIDIA NIM 的服務位址
         base_url=base,
         api_base=base,
-        # NVIDIA NIM 的驗證金鑰
-        api_key=os.getenv("NVIDIA_NIM_API_KEY"),
-        # 單次模型請求最多等待 500 秒
-        timeout=500,
-        # 啟用串流，讓 CrewAI 可以逐步接收模型輸出
-        stream=True,
+        api_key=os.getenv("NVIDIA_NIM_API_KEY"),  # 使用 .env 設定的 API Key
+        timeout=500,  # 等待 LLM 回應的秒數上限
+        stream=True,  # 一邊產生一邊接收 LLM 的輸出
     )
 
-
-# ── 建立 Knowledge 使用的 Embedding Model ────────────────────
+# 定義函式 build_embedder，建立知識庫使用的 Embedding Model 設定
 def build_embedder() -> dict:
-    """建立知識庫使用的 NVIDIA NIM Embedding 設定。"""
-    # Knowledge Embedding 同樣使用 NVIDIA NIM
+    # 同樣透過 OpenAI 相容介面呼叫 NVIDIA NIM
     return {
         "provider": "openai",
         "config": {
+            # 使用 .env 設定的 Embedding Model
             "model_name": os.getenv("EMBEDDING_MODEL"),
             "api_key": os.getenv("NVIDIA_NIM_API_KEY"),
             "api_base": os.getenv("NVIDIA_BASE_URL"),
         },
     }
 
-
-# ── 定義四位 Agent 的目標與行為規格 ────────────────────────
-
-# 景點與行程規劃 Agent 的目標：依偏好查證景點並整合團隊結果
+# 景點與行程規劃 Agent 的目標
 ITINERARY_PLANNER_GOAL = (
     "從使用者旅遊紀錄歸納偏好，查證適合的景點與活動，"
     "再整合住宿、天氣與交通資料，產出可以直接執行的完整行程；"
     "只有使用者明確要求時才匯出 Markdown 文件"
 )
 
-# 景點與行程規劃 Agent 的行為原則：定義 Knowledge、搜尋、整合與 Skill 邊界
+# 景點與行程規劃 Agent 的行為原則
 ITINERARY_PLANNER_BACKSTORY = """你是景點研究與行程編排的專家，也是團隊中唯一能讀取
 使用者過往旅遊紀錄 Knowledge 的 Agent。你負責把偏好真正反映在景點選擇、每日密度與
 活動安排中，並在資料齊全後整合住宿、天氣與交通資訊 Agent 的結果。
@@ -114,14 +87,13 @@ Manager 分派另外兩位 Agent。只有 Manager 把住宿資料與天氣交通
 itinerary-markdown-exporter Skill。第一次規劃、一般問答或只修改行程時不得載入 Skill，
 也不得呼叫 File Writer Tool。明確匯出時只使用最近一次完成版行程，並完整遵守 Skill。"""
 
-
-# 住宿規劃 Agent 的目標：查證住宿地點、價格與入住條件
+# 住宿規劃 Agent 的目標
 ACCOMMODATION_PLANNER_GOAL = (
     "根據行程區域、日期、人數、預算與偏好，查詢適合的住宿地點與可追溯價格，"
     "並說明各住宿對行程動線的影響"
 )
 
-# 住宿規劃 Agent 的行為原則：限制搜尋範圍並要求價格可追溯
+# 住宿規劃 Agent 的行為原則
 ACCOMMODATION_PLANNER_BACKSTORY = """你是專門處理住宿選址與房價的研究員。你只處理飯店、
 旅館、民宿、住宿區域、入住條件與住宿價格，不負責安排景點或完整每日行程。
 
@@ -152,14 +124,13 @@ View & Book 實際網址；不要使用 get_hotel_details 含超長 offerId 的�
 使用繁體中文純文字，不使用 Markdown 標題、表格或粗體。若收到修正委派，只補查
 Manager 指出的住宿缺口，不重做無關內容。"""
 
-
-# 天氣與交通資訊 Agent 的目標：查證預報、交通路線、票券與匯率
+# 天氣與交通資訊 Agent 的目標
 WEATHER_TRANSPORT_GOAL = (
     "查詢行程日期的天氣，以及各行程區間的大眾運輸、票券、交通費與必要匯率，"
     "提供可供行程調整的即時情報"
 )
 
-# 天氣與交通資訊 Agent 的行為原則：定義三項 MCP 工具的分工與交付方式
+# 天氣與交通資訊 Agent 的行為原則
 WEATHER_TRANSPORT_BACKSTORY = """你是天氣與大眾運輸情報研究員，只處理天氣、城市間或
 市內交通、交通票券、交通費及匯率，不自行增加景點或推薦住宿。
 
@@ -185,14 +156,13 @@ tavily_search 四次。匯率使用 get_rates，必須傳入 YYYY-MM-DD 格式�
 中文字、數字、標點、空白與網址全部計入，每類保留最直接的一至兩個網址。收到修正委派
 時只補查 Manager 指出的天氣或交通缺口。"""
 
-
-# Manager 的目標：依問題動態組合工作流程，並驗收三位 Worker 的結果
+# Manager Agent 的目標
 MANAGER_GOAL = (
     "根據使用者問題分派必要的專責 Agent，串接各階段結果並嚴格驗收，"
     "確認資料可追溯、內容完整且符合偏好後才交付答案"
 )
 
-# Manager 的行為原則：定義動態分派、完整行程順序與驗收條件
+# Manager Agent 的行為原則
 MANAGER_BACKSTORY = """你是旅遊團隊的主要 Agent，專門負責理解需求、分派工作、串接結果與
 驗收。你自己沒有 Knowledge 或外部工具，不得親自補充景點、住宿、天氣、交通、價格或來源。
 
@@ -245,86 +215,77 @@ Knowledge 證據過度推論。若結果包含 MCP error、<tool_call>、待取�
 與交通分類列出實際來源網址，每類保留最直接的一至兩個；不得只列工具或服務名稱。省略
 研究過程、過長介紹與重複數字。輸出前必須自行確認未超過一千五百字。"""
 
-
-# ── 建立一位 Manager Agent 與三位 Worker Agent ───────────────
-
-def build_agents(nim_llm: LLM, tools: ToolCollection) -> tuple[Agent, list[Agent]]:
-    """建立一位 Manager 與三位專責 Worker Agent。"""
-    # tools 是 MCPServerAdapter 回傳的 ToolCollection，可直接用名稱取得 MCP 工具
-
-    # 讀取 knowledge/ 資料夾中的旅遊紀錄
+# 定義函式 build_agents，建立 Manager Agent 與三個專責 Agent
+def build_agents(nim_llm: LLM, tools: ToolCollection) -> tuple[Agent, list[Agent]]:  # 輸入 LLM 與工具
+    # 讀取 knowledge 資料夾中的旅遊紀錄
     travel_records = TextFileKnowledgeSource(
-        # sorted() 固定檔案載入順序，避免系統回傳順序不同
+        # 固定檔案的讀取順序
         file_paths=sorted((PROJECT_DIR / "knowledge").glob("*.txt")),
-        # 每個文字區塊最多 256 個字元
-        chunk_size=256,
-        # 相鄰區塊重疊 50 個字元，保留跨區塊的語意
-        chunk_overlap=50,
+        chunk_size=256,  # 每個 Chunk 最多 256 個字元
+        chunk_overlap=50,  # 前後兩個 Chunk 重疊 50 個字元，避免語意被切斷
     )
 
-    # 景點與行程規劃 Agent：Knowledge、景點搜尋、完成版整合與 Markdown 匯出
+    # 建立景點與行程規劃 Agent
     itinerary_planner = Agent(
         role="景點與行程規劃 Agent",
         goal=ITINERARY_PLANNER_GOAL,
         backstory=ITINERARY_PLANNER_BACKSTORY,
         llm=nim_llm,
-        # 提供過往旅遊紀錄作為個人化規劃依據
-        knowledge_sources=[travel_records],
-        embedder=build_embedder(),
+        knowledge_sources=[travel_records],  # 綁定旅遊紀錄知識庫
+        embedder=build_embedder(),  # 知識庫使用的 Embedding Model
+        # 可以使用 Tavily 搜尋，以及把行程寫進 exports 資料夾的寫檔工具
         tools=[
             tools["tavily_search"],
             FileWriterTool(base_dir=str(PROJECT_DIR / "exports")),
         ],
-        skills=[MARKDOWN_EXPORT_SKILL],
-        # 預留 Knowledge、景點查證、行程整合與必要時寫檔的執行輪數
-        max_iter=5,
-        verbose=True,
+        skills=[MARKDOWN_EXPORT_SKILL],  # 綁定行程匯出 Skill
+        max_iter=5,  # 最多執行 5 輪
+        verbose=True,  # 顯示執行過程
     )
 
-    # 住宿規劃 Agent：住宿搜尋與指定日期價格換算
+    # 建立住宿規劃 Agent
     accommodation_planner = Agent(
         role="住宿規劃 Agent",
         goal=ACCOMMODATION_PLANNER_GOAL,
         backstory=ACCOMMODATION_PLANNER_BACKSTORY,
         llm=nim_llm,
+        # 可以使用飯店房價、飯店詳細資料、Tavily 搜尋與匯率工具
         tools=[
             tools["search_hotels_with_rates"],
             tools["get_hotel_details"],
             tools["tavily_search"],
             tools["get_rates"],
         ],
-        # 預留即時房價搜尋、候選詳情、必要交叉查證與匯率換算所需輪數
-        max_iter=5,
-        verbose=True,
+        max_iter=5,  # 最多執行 5 輪
+        verbose=True,  # 顯示執行過程
     )
 
-    # 天氣與交通資訊 Agent：天氣、交通搜尋、票券、交通費與匯率
+    # 建立天氣與交通資訊 Agent
     weather_transport = Agent(
         role="天氣與交通資訊 Agent",
         goal=WEATHER_TRANSPORT_GOAL,
         backstory=WEATHER_TRANSPORT_BACKSTORY,
         llm=nim_llm,
+        # 可以使用天氣預報、Tavily 搜尋與匯率工具
         tools=[
             tools["get_forecast"],
             tools["tavily_search"],
             tools["get_rates"],
         ],
-        # 預留一次預報、數個必要交通區間與匯率查詢的執行輪數
-        max_iter=5,
-        verbose=True,
+        max_iter=5,  # 最多執行 5 輪
+        verbose=True,  # 顯示執行過程
     )
 
-    # Manager Agent：只負責動態委派、串接與驗收，不直接持有資料工具
+    # 建立 Manager Agent，只負責分派與驗收，不持有工具
     manager = Agent(
         role="Manager Agent",
         goal=MANAGER_GOAL,
         backstory=MANAGER_BACKSTORY,
         llm=nim_llm,
-        allow_delegation=True,
-        # 完整行程需四次主要委派，並保留各階段一次具體修正空間
-        max_iter=10,
-        verbose=True,
+        allow_delegation=True,  # 可以把工作分派給其他 Agent
+        max_iter=10,  # 完整行程要分派四次，並保留修正的輪數
+        verbose=True,  # 顯示執行過程
     )
 
-    # Hierarchical Process 會依序把三位 Worker 提供給 Manager 動態委派
+    # 回傳 Manager Agent 與三個專責 Agent
     return manager, [itinerary_planner, accommodation_planner, weather_transport]

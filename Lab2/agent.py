@@ -1,28 +1,10 @@
-"""
-Travel Agent - Agent 建立
-========================
-agent.py 負責建立旅遊規劃 Agent 的系統提示詞、LLM、外部工具綁定與短期記憶。
-
-執行流程：
-    0. 載入套件與環境變數
-    1. 建立系統提示詞，定義 Agent 角色、工具規則與輸出格式
-    2. 使用 NVIDIA API 相容的 ChatOpenAI 初始化LLM
-    3. 將LLM、MCP tools、system prompt 與 InMemorySaver 組合成 Agent
-    4. 回傳可供 main.py 呼叫的 Agent
-
-此模組提供 build_system_prompt() 與 build_agent() 函式供 main.py 呼叫。
-"""
-
-# 載入套件
 import os
-
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 
-
+# 定義函式 build_system_prompt，建立 Agent 的系統提示詞
 def build_system_prompt() -> str:
-    """建立系統提示詞，用來告訴 Agent 回答時要遵守哪些規則。"""
     return """\
 你是個人化旅遊規劃助理。
 
@@ -95,20 +77,19 @@ def build_system_prompt() -> str:
 ## 語氣
 像朋友推薦，明確連結「因為你提到 X，所以推薦 Y」，不確定資訊標註「（建議出發前確認）」"""
 
-
-def build_agent(tools):
-    """建立旅遊 Agent，並把模型、工具和記憶功能組合起來。"""
-    # 初始化LLM，透過 NVIDIA API 相容端點呼叫 LLM
+# 定義函式 build_agent，把 LLM、工具與 Short-Term Memory 組合成旅遊 Agent
+def build_agent(tools):  # 輸入 MCP 工具清單
+    # 透過 NVIDIA NIM 的 OpenAI 相容端點初始化 LLM
     chat_model = ChatOpenAI(
-        base_url="https://integrate.api.nvidia.com/v1",
-        api_key=os.getenv("NVIDIA_API_KEY"),
-        model=os.getenv("CHAT_MODEL"),
+        base_url="https://integrate.api.nvidia.com/v1",  # NVIDIA NIM 的 API 端點
+        api_key=os.getenv("NVIDIA_API_KEY"),  # 使用 .env 設定的 API Key
+        model=os.getenv("CHAT_MODEL"),  # 使用 .env 設定的 LLM
     )
 
-    # 組合模型、工具、系統提示詞與短期記憶，建立可執行的 Agent
+    # 組合 LLM、工具、系統提示詞與 Short-Term Memory，建立 Agent
     return create_agent(
-        model=chat_model,                  # 負責思考與生成回覆的 LLM
-        tools=tools,                       # 可呼叫工具 Tavily 搜尋最新景點資訊和 open-meteo 查詢最新天氣資訊
-        system_prompt=build_system_prompt(),  # 系統提示詞，定義角色與規則
-        checkpointer=InMemorySaver(),      # 短期記憶，依 thread_id 保留多輪對話歷史（重啟即失）
+        model=chat_model,
+        tools=tools,  # Tavily 搜尋景點與 Open-Meteo 查詢天氣
+        system_prompt=build_system_prompt(),
+        checkpointer=InMemorySaver(),  # 依 thread_id 保留多輪對話歷史
     )

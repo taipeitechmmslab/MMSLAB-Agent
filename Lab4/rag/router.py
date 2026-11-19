@@ -1,44 +1,18 @@
-"""
-Router RAG - 旅遊偏好檢索器
-===========================
-router.py 負責組裝 RouterQueryEngine：從 clients.py 取得模型與 Milvus
-連線、從 indexes.py 取得四種索引，包成 QueryEngineTool 後交由
-RouterQueryEngine 依問題類型自動選擇檢索方式。
-
-相較於 Lab2 只使用單一 VectorStoreIndex，Lab3 新增 SummaryIndex、
-DocumentSummaryIndex 與 KeywordTableIndex，讓系統能針對不同類型的問題選擇最適合的檢索策略：
-    - SummaryIndex：掃過所有紀錄做摘要，適合歸納整體旅遊風格
-    - VectorStoreIndex：向量相似度檢索，適合查詢特定體驗細節
-    - DocumentSummaryIndex：以每篇文件摘要為檢索單位，選出最相關的整趟紀錄
-    - KeywordTableIndex：關鍵字反向表，適合精確名稱／專有名詞的字面命中
-
-執行流程：
-    0. 載入套件與環境變數
-    1. 透過 clients 建立 LLM、Embedding Model、Milvus 連線
-    2. 透過 indexes 讀取 ./data 並建立四個索引
-    3. 將四個索引包成 QueryEngineTool，寫明各自適合的問題類型
-    4. 透過 RouterQueryEngine + PydanticSingleSelector 自動選路
-
-此模組提供 build_router_query_engine() 函式供 main.py 呼叫。
-"""
-
 import logging
-
 from llama_index.core import PromptTemplate
 from llama_index.core.query_engine import RouterQueryEngine
 from llama_index.core.selectors import PydanticSingleSelector
 from llama_index.core.tools import QueryEngineTool
-
 from . import clients, indexes
 
-# ── 檢索設定常數 ─────────────────────────────────────
-VECTOR_TOP_K = 5       # 向量檢索取回相似度最高的 5 個 chunk
-DOC_SUMMARY_TOP_K = 3  # 由 LLM 從各篇摘要中挑出最相關的 3 趟旅行紀錄
-KEYWORD_TOP_K = 5      # 關鍵字命中後最多取回的 chunk 數
+# VectorStoreIndex 取回最相似的 5 個 Chunk
+VECTOR_TOP_K = 5
+# DocumentSummaryIndex 挑出最相關的 3 篇旅遊紀錄
+DOC_SUMMARY_TOP_K = 3
+# KeywordTableIndex 最多取回 5 個 Chunk
+KEYWORD_TOP_K = 5
 
-# ── 自訂 QA prompt：把 RAG 從「直接回答問題」改為「整理過往台灣經驗作為素材」 ────
-# 這樣即使使用者問海外目的地（例：京都有溪谷步道嗎），RAG 不會回「無京都資料」，
-# 而是回傳使用者過往在台灣相關的具體經驗，供後續 Agent + Tavily 規劃使用
+# 自訂 Prompt，讓 RAG 整理過往的台灣旅遊經驗，不直接回答問題
 ORGANIZE_QA_TEMPLATE = PromptTemplate(
     "以下是從使用者過往「台灣」旅遊紀錄中檢索到的片段：\n"
     "---------------------\n"
@@ -58,23 +32,13 @@ ORGANIZE_QA_TEMPLATE = PromptTemplate(
     "整理結果："
 )
 
-
-# ── 建立四個索引並包成選路工具 ───────────────────────
-def _build_tools(summary_index, vector_index, doc_summary_index, keyword_index, llm, summary_llm):
-    """把四個索引包成 QueryEngineTool，並各自設定查詢時要用的 LLM 與檢索參數。
-
-    description 是 RouterQueryEngine 選路時唯一的判斷依據——selector 不會看索引
-    內容，只把使用者問題連同這四段 description 交給 LLM 挑一個，所以每段都要寫清楚
-    「什麼樣的問題該走這條」，以及「和其他三條的差別」。
-
-    四個 query engine 共用 ORGANIZE_QA_TEMPLATE，讓檢索結果統一整理成「過往台灣
-    經驗」而不是直接回答問題，後續才好交給 Agent 當規劃素材使用。
-    """
+# 定義函式 _build_tools，把四種 Index 包成 RouterQueryEngine 可以選擇的工具
+def _build_tools(summary_index, vector_index, doc_summary_index, keyword_index, llm, summary_llm):  # 輸入 Index 與 LLM
+    # 把 SummaryIndex 包成工具，description 寫明適合總覽型問題
     summary_tool = QueryEngineTool.from_defaults(
         query_engine=summary_index.as_query_engine(
-            # 用便宜模型：tree_summarize 查詢時會掃過全部 chunk，是四條路最吃 token 的
-            llm=summary_llm,
-            response_mode="tree_summarize",  # 樹狀摘要：分組局部摘要，再逐層向上合併成總結
+            llm=summary_llm,  # 查詢時會讀過全部 Chunk，所以使用摘要 LLM
+            response_mode="tree_summarize",  # 先分組摘要，再逐層合併成總結
             summary_template=ORGANIZE_QA_TEMPLATE,
         ),
         description=(
@@ -84,6 +48,7 @@ def _build_tools(summary_index, vector_index, doc_summary_index, keyword_index, 
         ),
     )
 
+    # 把 VectorStoreIndex 包成工具，description 寫明適合語意型問題
     vector_tool = QueryEngineTool.from_defaults(
         query_engine=vector_index.as_query_engine(
             llm=llm,
@@ -97,10 +62,11 @@ def _build_tools(summary_index, vector_index, doc_summary_index, keyword_index, 
         ),
     )
 
+    # 把 DocumentSummaryIndex 包成工具，description 寫明適合文件摘要篩選型問題
     doc_summary_tool = QueryEngineTool.from_defaults(
         query_engine=doc_summary_index.as_query_engine(
-            llm=llm,                # 合成用主模型 CHAT_MODEL；建索引時的每篇摘要才用便宜的 summary_llm
-            retriever_mode="llm",   # 使用 LLM 比對各篇文件摘要，挑選最相關的文件
+            llm=llm,  # 使用主要 LLM 整理回答
+            retriever_mode="llm",  # 由 LLM 比對每篇摘要，挑出最相關的旅遊紀錄
             choice_top_k=DOC_SUMMARY_TOP_K,
             text_qa_template=ORGANIZE_QA_TEMPLATE,
         ),
@@ -113,9 +79,10 @@ def _build_tools(summary_index, vector_index, doc_summary_index, keyword_index, 
         ),
     )
 
+    # 把 KeywordTableIndex 包成工具，description 寫明適合精確名詞型問題
     keyword_tool = QueryEngineTool.from_defaults(
         query_engine=keyword_index.as_query_engine(
-            llm=llm,                          # 最終合成用 CHAT_MODEL；抽關鍵字用的是建索引時綁的便宜模型
+            llm=llm,  # 使用主要 LLM 整理回答
             num_chunks_per_query=KEYWORD_TOP_K,
             text_qa_template=ORGANIZE_QA_TEMPLATE,
         ),
@@ -127,50 +94,44 @@ def _build_tools(summary_index, vector_index, doc_summary_index, keyword_index, 
         ),
     )
 
+    # 回傳四個工具
     return [summary_tool, vector_tool, doc_summary_tool, keyword_tool]
 
-
-# ── 組裝 RouterQueryEngine ───────────────────────────
+# 定義函式 build_router_query_engine，建立 RouterQueryEngine
 def build_router_query_engine():
-    """建立 RouterQueryEngine，依問題類型自動在四種索引之間選路。
-
-    先透過 clients 建好模型與 Milvus 連線，再用同一份 documents 與 splitter 建出
-    四個索引，包成 tool 後交給 PydanticSingleSelector：selector 只會挑一條路，
-    由選中的 query engine 檢索，最後用主模型 llm 合成回應。
-    """
+    # 建立主要 LLM、摘要 LLM、Embedding Model 與 Milvus 向量資料庫連線
     llm = clients.build_llm()
-    summary_llm = clients.build_summary_llm()  # 便宜快速模型：SummaryIndex 查詢與另兩個索引建索引時都用它
+    summary_llm = clients.build_summary_llm()
     embed_model = clients.build_embed_model()
     vector_store = clients.build_milvus_vector_store()
     splitter = indexes.build_splitter()
 
+    # 讀取旅遊紀錄
     print("🔨 讀取 ./data 旅遊紀錄")
     documents = indexes.load_data_docs()
 
+    # 建立四種 Index，DocumentSummaryIndex 與 KeywordTableIndex 使用摘要 LLM
     summary_index = indexes.build_summary_index(documents, splitter)
     vector_index = indexes.build_vector_index(documents, splitter, embed_model, vector_store)
     doc_summary_index = indexes.build_document_summary_index(documents, splitter, summary_llm, embed_model)
-    keyword_index = indexes.build_keyword_index(documents, splitter, summary_llm)  # 抽關鍵字用便宜模型
+    keyword_index = indexes.build_keyword_index(documents, splitter, summary_llm)
 
+    # 把四種 Index 包成工具
     tools = _build_tools(summary_index, vector_index, doc_summary_index, keyword_index, llm, summary_llm)
 
-    # selector 會把使用者問題連同上面四個工具的 description 一起交給 LLM，
-    # description 是 LLM 選路時唯一讀到的判斷依據：
-    #   總覽型問題 → summary_tool（SummaryIndex，綜觀全部紀錄做摘要）
-    #   語意型問題 → vector_tool（VectorStoreIndex，top-k 相似檢索）
-    #   整趟紀錄回顧 → doc_summary_tool（DocumentSummaryIndex，以摘要挑整篇文件）
-    #   精確名稱命中 → keyword_tool（KeywordTableIndex，關鍵字反向表字面命中）
+    # 建立 RouterQueryEngine，由 LLM 讀取每個工具的 description 後選出一個
     router_engine = RouterQueryEngine(
         selector=PydanticSingleSelector.from_defaults(llm=llm),
         query_engine_tools=tools,
-        llm=llm,        # 合成用的 LLM：把選中 tool 檢索出的結果整理成最終回應
-        verbose=False,  # 關掉內建選路 print，改由 chat.py 統一輸出一行
+        llm=llm,  # 把檢索結果整理成最後的回答
+        verbose=False,  # 不顯示內建的選路訊息，改由 chat.py 顯示
     )
 
-    # 壓掉 LlamaIndex router 內部的 INFO log（同樣會印 "Selecting query engine N"），避免重複
+    # 關閉 RouterQueryEngine 內部的選路紀錄，避免重複顯示
     logging.getLogger("llama_index.core.query_engine.router_query_engine").setLevel(
         logging.WARNING
     )
 
+    # 提示建立完成，並回傳 RouterQueryEngine
     print("✅ RouterQueryEngine 建立完成（SummaryIndex + VectorStoreIndex + DocumentSummaryIndex + KeywordTableIndex）")
     return router_engine
