@@ -29,7 +29,7 @@ def _print_update(namespace, data):  # 輸入更新的來源與內容
                     # 顯示呼叫了哪個工具
                     for tool_call in message.tool_calls:
                         print(f"\n呼叫工具: {tool_call['name']}")
-                        print(f"   參數：{preview_text(tool_call['args'], 120)}")
+                        print(f"參數：{preview_text(tool_call['args'], 120)}")
                 # 顯示工具回傳的結果
                 elif isinstance(message, ToolMessage):
                     print(f"工具回傳: {preview_text(message.content, 150)}")
@@ -81,8 +81,8 @@ async def run_chat(graph):  # 輸入 graph
 個人化旅遊規劃 Agentic AI（LangGraph）已就緒
 輸入旅遊需求開始規劃，輸入 'exit' 或 'quit' 結束
 範例：
-   1. 幫我安排下周二三天兩夜的大阪的古蹟參訪行程
-   2. 幫我把 Day 2 改成以室內景點為主
+1. 幫我安排下周二三天兩夜的大阪的古蹟參訪行程
+2. 幫我把 Day 2 改成以室內景點為主
 ==================================================
 """
     )
@@ -121,7 +121,7 @@ async def run_chat(graph):  # 輸入 graph
         # API 出錯時顯示錯誤訊息
         except APIError as error:
             print(f"\n\nNVIDIA API 呼叫失敗，這輪規劃未完成：{error}")
-            print("   通常是端點限流或服務暫時過載，稍等一兩分鐘再重問一次即可。\n")
+            print("通常是端點限流或服務暫時過載，稍等一兩分鐘再重問一次即可。\n")
         else:
             # 這輪規劃完成
             print("\n\n本輪規劃完成\n")
