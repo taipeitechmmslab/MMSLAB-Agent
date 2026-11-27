@@ -34,6 +34,6 @@ def build_graph(retrieve_preferences, planner, executor, reflect):  # 輸入四�
     # 加上 MemorySaver 記住對話內容，再編譯 graph
     app = builder.compile(checkpointer=MemorySaver())
     # 顯示 graph 已建立完成
-    print("✅ StateGraph 建構完成")
+    print("StateGraph 建構完成")
     # 回傳 graph
     return app

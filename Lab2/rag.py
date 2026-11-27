@@ -38,7 +38,7 @@ def build_vector_store():
     )
 
     # 提示使用者正在建立資料庫
-    print("🔨 建立 Milvus collection，讀取 ./data")
+    print("建立 Milvus collection，讀取 ./data")
 
     # 讀取旅遊紀錄，並切成 Chunk
     documents = load_data_docs()
@@ -53,7 +53,7 @@ def build_vector_store():
         drop_old=True,  # 每次啟動都先清掉舊資料
     )
     # 顯示存了幾筆資料
-    print(f"✅ 已建立 {len(chunks)} 筆向量，存入 http://localhost:19530")
+    print(f"已建立 {len(chunks)} 筆向量，存入 http://localhost:19530")
 
     # 回傳建立好的向量資料庫
     return vector_store

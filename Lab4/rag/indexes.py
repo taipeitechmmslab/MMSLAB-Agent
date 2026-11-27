@@ -29,13 +29,13 @@ def build_splitter():
 
 # 定義函式 build_summary_index，建立 SummaryIndex
 def build_summary_index(documents, splitter):  # 輸入 Document 列表與切分器
-    print("📋 建立 SummaryIndex...")
+    print("建立 SummaryIndex...")
     # 切好 Chunk 後依序存起來，建立時不呼叫 LLM
     return SummaryIndex.from_documents(documents, transformations=[splitter])
 
 # 定義函式 build_vector_index，建立 VectorStoreIndex，並把向量存進 Milvus 向量資料庫
 def build_vector_index(documents, splitter, embed_model, vector_store):  # 輸入資料與模型
-    print("🔢 建立 VectorStoreIndex + Milvus...")
+    print("建立 VectorStoreIndex + Milvus...")
     # 指定向量要存進 Milvus 向量資料庫
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
     return VectorStoreIndex.from_documents(
@@ -47,7 +47,7 @@ def build_vector_index(documents, splitter, embed_model, vector_store):  # 輸�
 
 # 定義函式 build_document_summary_index，建立 DocumentSummaryIndex
 def build_document_summary_index(documents, splitter, llm, embed_model):  # 輸入資料
-    print("📝 建立 DocumentSummaryIndex（每篇各生一段 LLM 摘要）...")
+    print("建立 DocumentSummaryIndex（每篇各生一段 LLM 摘要）...")
     return DocumentSummaryIndex.from_documents(
         documents,
         llm=llm,  # 為每一篇旅遊紀錄產生摘要
@@ -58,7 +58,7 @@ def build_document_summary_index(documents, splitter, llm, embed_model):  # 輸�
 
 # 定義函式 build_keyword_index，建立 KeywordTableIndex
 def build_keyword_index(documents, splitter, llm):  # 輸入 Document 列表、切分器與 LLM
-    print("🔑 建立 KeywordTableIndex（LLM 抽關鍵字）...")
+    print("建立 KeywordTableIndex（LLM 抽關鍵字）...")
     return KeywordTableIndex.from_documents(
         documents,
         llm=llm,  # 從每個 Chunk 抽出關鍵字

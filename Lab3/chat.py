@@ -28,11 +28,11 @@ def _print_update(namespace, data):  # 輸入更新的來源與內容
                 if isinstance(message, AIMessage) and message.tool_calls:
                     # 顯示呼叫了哪個工具
                     for tool_call in message.tool_calls:
-                        print(f"\n🔧 呼叫工具: {tool_call['name']}")
+                        print(f"\n呼叫工具: {tool_call['name']}")
                         print(f"   參數：{preview_text(tool_call['args'], 120)}")
                 # 顯示工具回傳的結果
                 elif isinstance(message, ToolMessage):
-                    print(f"✅ 工具回傳: {preview_text(message.content, 150)}")
+                    print(f"工具回傳: {preview_text(message.content, 150)}")
         return
 
     # 依照 node 的名稱，顯示各自的結果
@@ -42,7 +42,7 @@ def _print_update(namespace, data):  # 輸入更新的來源與內容
             preferences = output.get("preferences")
             if preferences:
                 print_header("Retrieve Preferences — 偏好前置檢索")
-                print('📚 輸出欄位：state["preferences"]（偏好原文片段）')
+                print('輸出欄位：state["preferences"]（偏好原文片段）')
                 print(preview_text(preferences, 600))
         # planner node：顯示計畫
         elif node_name == "planner":
@@ -78,9 +78,9 @@ async def run_chat(graph):  # 輸入 graph
     print(
         """
 ==================================================
-🧳 個人化旅遊規劃 Agentic AI（LangGraph）已就緒
-💡 輸入旅遊需求開始規劃，輸入 'exit' 或 'quit' 結束
-💡 範例：
+個人化旅遊規劃 Agentic AI（LangGraph）已就緒
+輸入旅遊需求開始規劃，輸入 'exit' 或 'quit' 結束
+範例：
    1. 幫我安排下周二三天兩夜的大阪的古蹟參訪行程
    2. 幫我把 Day 2 改成以室內景點為主
 ==================================================
@@ -95,7 +95,7 @@ async def run_chat(graph):  # 輸入 graph
         user_input = read_query(turn)
         # 使用者要結束對話
         if user_input is None:
-            print("\n👋 再見")
+            print("\n再見")
             break
         # 只按 Enter 就重新等待輸入
         if not user_input:
@@ -120,11 +120,11 @@ async def run_chat(graph):  # 輸入 graph
                 _print_update(namespace, data)
         # API 出錯時顯示錯誤訊息
         except APIError as error:
-            print(f"\n\n⚠️ NVIDIA API 呼叫失敗，這輪規劃未完成：{error}")
+            print(f"\n\nNVIDIA API 呼叫失敗，這輪規劃未完成：{error}")
             print("   通常是端點限流或服務暫時過載，稍等一兩分鐘再重問一次即可。\n")
         else:
             # 這輪規劃完成
-            print("\n\n✅ 本輪規劃完成\n")
+            print("\n\n本輪規劃完成\n")
 
         # 輪次加一
         turn += 1

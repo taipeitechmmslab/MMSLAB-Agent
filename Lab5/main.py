@@ -85,7 +85,7 @@ def main() -> None:
             exit_commands=("exit", "quit", "離開", "結束"),  # 結束對話的指令
         )
         # 使用者結束對話後顯示再見
-        print("\n👋 再見")
+        print("\n再見")
     finally:
         # 不論正常結束或發生錯誤，都關閉 npx 啟動的 MCP Server
         adapter.stop()
