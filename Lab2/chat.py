@@ -3,7 +3,7 @@ from prompt import read_query
 # 定義函式 run_query，執行一輪問答，並在終端機即時顯示過程
 async def run_query(rag_agent_chain, query: str, config: dict):  # 輸入 chain、問題與設定
     # 提示使用者 Agent 正在處理
-    print("\n⏳ Agent 思考中...\n")
+    print("\nAgent 思考中...\n")
 
     # 用 astream_events 邊執行邊接收每個步驟的事件
     async for event in rag_agent_chain.astream_events(query, config=config, version="v2"):
@@ -14,7 +14,7 @@ async def run_query(rag_agent_chain, query: str, config: dict):  # 輸入 chain�
         # RAG 檢索完成：顯示從 Milvus 找到的偏好資料
         if event_type == "on_retriever_end":
             docs = event_data.get("output", [])
-            print(f"📚 從 Milvus 檢索到 {len(docs)} 筆偏好資料：")
+            print(f"從 Milvus 檢索到 {len(docs)} 筆偏好資料：")
             # 每筆只顯示前 80 個字，並把換行換成空白
             for i, doc in enumerate(docs, 1):
                 snippet = doc.page_content[:80].replace("\n", " ")
@@ -32,11 +32,11 @@ async def run_query(rag_agent_chain, query: str, config: dict):  # 輸入 chain�
         elif event_type == "on_tool_start":
             tool_name = event["name"]
             tool_input = event_data.get("input", "")
-            print(f"\n🔧 呼叫工具: {tool_name}({tool_input})")
+            print(f"\n呼叫工具: {tool_name}({tool_input})")
 
         # 工具回傳結果：只顯示前 150 個字
         elif event_type == "on_tool_end":
-            print(f"✅ 工具回傳: {str(event_data.get('output', ''))[:150]}...")
+            print(f"工具回傳: {str(event_data.get('output', ''))[:150]}...")
 
     print()
 
@@ -49,9 +49,9 @@ async def run_chat(rag_agent_chain):  # 輸入 chain
     print(
         """
 ==================================================
-🧳 旅遊規劃助理已就緒（支援國內/國外規劃）
-💡 輸入問題開始對話，輸入 'exit' 或 'quit' 結束
-💡 範例：
+旅遊規劃助理已就緒（支援國內/國外規劃）
+輸入問題開始對話，輸入 'exit' 或 'quit' 結束
+範例：
    1. 幫我安排下周二三天兩夜的大阪的古蹟參訪行程
    2. 京都的氛圍跟我去過的哪個台灣地方比較像？
 ==================================================
@@ -67,7 +67,7 @@ async def run_chat(rag_agent_chain):  # 輸入 chain
 
         # 使用者要結束對話，就說再見並離開迴圈
         if query is None:
-            print("\n👋 再見")
+            print("\n再見")
             break
         # 使用者只按 Enter，就跳過這一輪
         if not query:

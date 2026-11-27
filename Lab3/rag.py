@@ -7,7 +7,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 # 定義函式 build_retriever，把旅遊紀錄存進 Milvus 向量資料庫，並建立檢索器
 def build_retriever():
     # 提示使用者正在建立資料庫
-    print("🔨 建立 Milvus collection，讀取 ./data")
+    print("建立 Milvus collection，讀取 ./data")
 
     # 讀取 data 資料夾裡所有的旅遊紀錄
     documents = DirectoryLoader(
@@ -33,7 +33,7 @@ def build_retriever():
         drop_old=True,  # 每次啟動都先清掉舊資料
     )
     # 顯示存了幾筆資料
-    print(f"✅ 已建立 {len(chunks)} 筆向量，存入 http://localhost:19530")
+    print(f"已建立 {len(chunks)} 筆向量，存入 http://localhost:19530")
 
     # 建立檢索器，每次找出最相關的 5 段
     return vector_store.as_retriever(search_kwargs={"k": 5})

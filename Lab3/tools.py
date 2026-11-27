@@ -47,6 +47,6 @@ async def load_mcp_tools():
         tool.handle_tool_error = _tool_error_hint
 
     # 顯示取得幾個工具
-    print(f"✅ 已組裝 {len(tools)} 個 MCP 工具")
+    print(f"已組裝 {len(tools)} 個 MCP 工具")
     # 回傳 MCP Client 與工具清單
     return client, tools

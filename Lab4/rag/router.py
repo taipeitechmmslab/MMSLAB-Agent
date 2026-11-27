@@ -107,7 +107,7 @@ def build_router_query_engine():
     splitter = indexes.build_splitter()
 
     # 讀取旅遊紀錄
-    print("🔨 讀取 ./data 旅遊紀錄")
+    print("讀取 ./data 旅遊紀錄")
     documents = indexes.load_data_docs()
 
     # 建立四種 Index，DocumentSummaryIndex 與 KeywordTableIndex 使用摘要 LLM
@@ -133,5 +133,5 @@ def build_router_query_engine():
     )
 
     # 提示建立完成，並回傳 RouterQueryEngine
-    print("✅ RouterQueryEngine 建立完成（SummaryIndex + VectorStoreIndex + DocumentSummaryIndex + KeywordTableIndex）")
+    print("RouterQueryEngine 建立完成（SummaryIndex + VectorStoreIndex + DocumentSummaryIndex + KeywordTableIndex）")
     return router_engine

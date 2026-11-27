@@ -17,5 +17,5 @@ async def load_mcp_tools():
     meteo_tools = await meteo_spec.to_tool_list_async()
 
     # 顯示載入的工具數量，並把兩份工具清單合併回傳
-    print(f"🔧 已載入 MCP 工具：Tavily {len(tavily_tools)} 個、Open-Meteo {len(meteo_tools)} 個")
+    print(f"已載入 MCP 工具：Tavily {len(tavily_tools)} 個、Open-Meteo {len(meteo_tools)} 個")
     return tavily_tools + meteo_tools
