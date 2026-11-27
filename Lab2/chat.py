@@ -18,7 +18,7 @@ async def run_query(rag_agent_chain, query: str, config: dict):  # 輸入 chain�
             # 每筆只顯示前 80 個字，並把換行換成空白
             for i, doc in enumerate(docs, 1):
                 snippet = doc.page_content[:80].replace("\n", " ")
-                print(f"   {i}. {snippet}...")
+                print(f"{i}. {snippet}...")
             print()
 
         # LLM 產生文字：一個字一個字顯示回答
@@ -52,8 +52,8 @@ async def run_chat(rag_agent_chain):  # 輸入 chain
 旅遊規劃助理已就緒（支援國內/國外規劃）
 輸入問題開始對話，輸入 'exit' 或 'quit' 結束
 範例：
-   1. 幫我安排下周二三天兩夜的大阪的古蹟參訪行程
-   2. 京都的氛圍跟我去過的哪個台灣地方比較像？
+1. 幫我安排下周二三天兩夜的大阪的古蹟參訪行程
+2. 京都的氛圍跟我去過的哪個台灣地方比較像？
 ==================================================
 """
     )

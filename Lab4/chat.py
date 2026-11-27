@@ -27,7 +27,7 @@ async def run_query(router_engine, agent, ctx, query: str):  # 輸入檢索器�
             for sel in selector_result.selections:
                 choice = sel.index + 1
                 print(f"Router 選路結果：choice ({choice}) {tool_names.get(choice, '')}")
-                print(f"   理由：{sel.reason}")
+                print(f"理由：{sel.reason}")
 
         # 顯示檢索到的偏好摘要，只顯示前 200 個字
         rag_text = str(rag_response)
@@ -58,7 +58,7 @@ async def run_query(router_engine, agent, ctx, query: str):  # 輸入檢索器�
     except APIError as error:
         # API 呼叫失敗時只放棄這一輪，不讓程式中斷
         print(f"\nNVIDIA API 呼叫失敗，這輪回答未完成：{error}")
-        print("   通常是端點限流（429/503），稍等一兩分鐘再重問一次即可。")
+        print("通常是端點限流（429/503），稍等一兩分鐘再重問一次即可。")
 
 # 定義函式 run_chat，啟動多輪對話，直到使用者結束
 async def run_chat(router_engine, agent):  # 輸入 RouterQueryEngine 與 Agent
@@ -71,10 +71,10 @@ async def run_chat(router_engine, agent):  # 輸入 RouterQueryEngine 與 Agent
 旅遊規劃助理已就緒（支援國內/國外規劃）
 輸入問題開始對話，輸入 'exit' 或 'quit' 結束
 範例：
-   1. [KeywordTableIndex] 我之前住過的「木門厝」有哪些住宿特色？請記住這種風格，之後用來挑大阪住宿
-   2. [DocumentSummaryIndex] 那我那趟去台南的行程詳細的景點安排和心得是什麼
-   3. [VectorStoreIndex] 接著我想走沿溪谷、溪水清澈的健行步道。請參考我過去走過的類似地點，找出大阪附近符合這類特色的健行路線
-   4. [SummaryIndex] 最後請從我過去的旅遊紀錄中，歸納我的旅遊偏好並統計我過去旅行平均一天安排幾個景點、整體步調多快，作為大阪行程的安排節奏
+1. [KeywordTableIndex] 我之前住過的「木門厝」有哪些住宿特色？請記住這種風格，之後用來挑大阪住宿
+2. [DocumentSummaryIndex] 那我那趟去台南的行程詳細的景點安排和心得是什麼
+3. [VectorStoreIndex] 接著我想走沿溪谷、溪水清澈的健行步道。請參考我過去走過的類似地點，找出大阪附近符合這類特色的健行路線
+4. [SummaryIndex] 最後請從我過去的旅遊紀錄中，歸納我的旅遊偏好並統計我過去旅行平均一天安排幾個景點、整體步調多快，作為大阪行程的安排節奏
 ==================================================
 """)
 
